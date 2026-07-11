@@ -79,10 +79,10 @@ Once the graph satisfies the degree constraints, it maps the abstract topologica
 
 
 
-$$x = \text{STEP} \times (q // k)$$
+$$x = \text{STEP} \times \text{(q div k)}$$
 
 
-$$y = \text{STEP} \times (q \% k)$$
+$$y = \text{STEP} \times \text{(q mod k)}$$
 
 
 * **Temporal Axis ($Z$-unrolling):** The execution timeline flows along the $Z$-axis. Graph vertices are grouped dynamically by their sequence layers. As nodes in a layer are physically placed at the current $Z$-level, the algorithm increments the layer index to the next available vertical ceiling ($\text{max z} + 1$) to ensure routing clearance.
