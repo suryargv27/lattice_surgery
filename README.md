@@ -65,7 +65,7 @@ Because physical hardware topologies or routing grids cannot accommodate arbitra
 * **Chain Generation:** For a high-degree vertex $v$, its neighbors are sorted sequentially by their timeline row value.
 
 
-* **Properties Preservation:** The original vertex is removed. It is replaced by a linear sequence of $n$ new vertices linked by chain edges. The original gate phase is retained exclusively on the first node in the chain ($\text{phase\_value} = \text{phase}$ if $i == 0$ else $0$) to maintain semantic equality.
+* **Properties Preservation:** The original vertex is removed. It is replaced by a linear sequence of $n$ new vertices linked by chain edges. The original gate phase is retained exclusively on the first node in the chain ($\text{phase value} = \text{phase}$ if $i == 0$ else $0$) to maintain semantic equality.
 
 
 
@@ -79,13 +79,13 @@ Once the graph satisfies the degree constraints, it maps the abstract topologica
 
 
 
-$$x = \text{STEP} \times (q \mathbin{//} k)$$
+$$x = \text{STEP} \times (q // k)$$
 
 
 $$y = \text{STEP} \times (q \% k)$$
 
 
-* **Temporal Axis ($Z$-unrolling):** The execution timeline flows along the $Z$-axis. Graph vertices are grouped dynamically by their sequence layers. As nodes in a layer are physically placed at the current $Z$-level, the algorithm increments the layer index to the next available vertical ceiling ($\text{max\_z} + 1$) to ensure routing clearance.
+* **Temporal Axis ($Z$-unrolling):** The execution timeline flows along the $Z$-axis. Graph vertices are grouped dynamically by their sequence layers. As nodes in a layer are physically placed at the current $Z$-level, the algorithm increments the layer index to the next available vertical ceiling ($\text{max z} + 1$) to ensure routing clearance.
 
 
 
