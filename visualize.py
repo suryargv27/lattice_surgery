@@ -3,13 +3,13 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
 cmap = {
     "X": "red",
-    "Y": "green",
+    "S": "green",
     "Z": "blue",
     "H": "yellow",
     "0": "gray",
+    "T": "magenta",
+    "R": "purple",   
 }
-
-H_PIPE_COLORS = ["yellow"] * 6
 
 def set_axes_equal(ax):
 
@@ -59,11 +59,8 @@ class Cube:
         self.type = type
 
     def get_vertices(self):
-
         r = 0.2
-
         x, y, z = self.pos
-
         return [
             [x - r, y - r, z - r],
             [x + r, y - r, z - r],
@@ -76,9 +73,7 @@ class Cube:
         ]
 
     def get_faces(self):
-
         v = self.get_vertices()
-
         return [
             [v[1], v[2], v[6], v[5]],
             [v[0], v[3], v[7], v[4]],
@@ -89,15 +84,11 @@ class Cube:
         ]
 
     def get_colors(self):
-
         return [cmap[ch] for ch in self.orientation for _ in range(2)]
 
     def draw(self, ax):
-
         faces = self.get_faces()
-
         colors = self.get_colors()
-
         ax.add_collection3d(
             Poly3DCollection(
                 faces,
@@ -109,99 +100,53 @@ class Cube:
 
 class Pipe:
 
-    def __init__(self, cube1, cube2):
+    def __init__(self, pos1, pos2, orientation):
+        self.pos1 = pos1
+        self.pos2 = pos2
+        self.orientation = orientation
 
-        self.cube1 = cube1
-        self.cube2 = cube2
-
+    def get_vertices_for_pos(self, pos):
+        """Helper to get 8 corner vertices for a given position."""
+        r = 0.2
+        x, y, z = pos
+        return [
+            [x - r, y - r, z - r],
+            [x + r, y - r, z - r],
+            [x + r, y + r, z - r],
+            [x - r, y + r, z - r],
+            [x - r, y - r, z + r],
+            [x + r, y - r, z + r],
+            [x + r, y + r, z + r],
+            [x - r, y + r, z + r],
+        ]
+    
     def get_faces(self):
-
-        v1 = self.cube1.get_vertices()
-        v2 = self.cube2.get_vertices()
+        v1 = self.get_vertices_for_pos(self.pos1)
+        v2 = self.get_vertices_for_pos(self.pos2)
 
         d = (
-            self.cube2.pos[0] - self.cube1.pos[0],
-            self.cube2.pos[1] - self.cube1.pos[1],
-            self.cube2.pos[2] - self.cube1.pos[2],
+            self.pos2[0] - self.pos1[0],
+            self.pos2[1] - self.pos1[1],
+            self.pos2[2] - self.pos1[2],
         )
 
         if d == (1, 0, 0):
-
-            v = [
-                v2[0],
-                v1[1],
-                v1[2],
-                v2[3],
-                v2[4],
-                v1[5],
-                v1[6],
-                v2[7],
-            ]
-
+            v = [v2[0], v1[1], v1[2], v2[3], v2[4], v1[5], v1[6], v2[7]]
         elif d == (-1, 0, 0):
-
-            v = [
-                v1[0],
-                v2[1],
-                v2[2],
-                v1[3],
-                v1[4],
-                v2[5],
-                v2[6],
-                v1[7],
-            ]
-
+            v = [v1[0], v2[1], v2[2], v1[3], v1[4], v2[5], v2[6], v1[7]]
         elif d == (0, 1, 0):
-
-            v = [
-                v2[0],
-                v2[1],
-                v1[2],
-                v1[3],
-                v2[4],
-                v2[5],
-                v1[6],
-                v1[7],
-            ]
-
+            v = [v2[0], v2[1], v1[2], v1[3], v2[4], v2[5], v1[6], v1[7]]
         elif d == (0, -1, 0):
-
-            v = [
-                v1[0],
-                v1[1],
-                v2[2],
-                v2[3],
-                v1[4],
-                v1[5],
-                v2[6],
-                v2[7],
-            ]
-
+            v = [v1[0], v1[1], v2[2], v2[3], v1[4], v1[5], v2[6], v2[7]]
         elif d == (0, 0, 1):
-
-            v = [
-                v2[0],
-                v2[1],
-                v2[2],
-                v2[3],
-                v1[4],
-                v1[5],
-                v1[6],
-                v1[7],
-            ]
-
+            v = [v2[0], v2[1], v2[2], v2[3], v1[4], v1[5], v1[6], v1[7]]
         elif d == (0, 0, -1):
-
-            v = [
-                v1[0],
-                v1[1],
-                v1[2],
-                v1[3],
-                v2[4],
-                v2[5],
-                v2[6],
-                v2[7],
-            ]
+            v = [v1[0], v1[1], v1[2], v1[3], v2[4], v2[5], v2[6], v2[7]]
+        else:
+            raise ValueError(
+                f"Pipe requires pos1/pos2 to differ by exactly one unit step in a "
+                f"single axis; got pos1={self.pos1}, pos2={self.pos2}, delta={d}"
+            )
 
         return [
             [v[1], v[2], v[6], v[5]],
@@ -212,11 +157,12 @@ class Pipe:
             [v[0], v[1], v[2], v[3]],
         ]
 
-    def draw(self, ax, colors = None):
+    def get_colors(self):
+        return [cmap[ch] for ch in self.orientation for _ in range(2)]
 
+    def draw(self, ax):
         faces = self.get_faces()
-        if colors is None:
-            colors = self.cube1.get_colors()
+        colors = self.get_colors()
         ax.add_collection3d(
             Poly3DCollection(
                 faces,
@@ -224,3 +170,4 @@ class Pipe:
                 edgecolors="k",
             )
         )
+
