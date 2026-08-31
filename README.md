@@ -1,23 +1,59 @@
 # 3D Spatial Routing and Embedding of ZX-Graphs
 
+A comprehensive quantum circuit routing and 3D spatial embedding framework for lattice surgery operations. This project implements advanced algorithms for mapping logical ZX-graph representations onto physical 3D grids with support for Pauli frame tracking, multi-stage routing, and magic state distillation.
 
-## Usage
-To execute the 3D pipeline on an OpenQASM benchmark file (e.g., a 16-qubit GHZ state or Bernstein-Vazirani circuit), run:
+## Overview
+
+This codebase provides:
+- **ZX-Graph Simplification** via PyZX with configurable degree constraints (3 or 4)
+- **3D Spatial Grid Assignment** with 2D qubit floorplan and Z-axis time-unrolling
+- **Stateful A* Pathfinding** with orientation tracking and parity preservation
+- **Multi-Stage Routing** for inter-qubit gates and qubit wire connections
+- **Pauli Frame Tracking** for implicit gate compensation
+- **Visualization Framework** with interactive 3D Matplotlib rendering
+- **Magic State Distillation** and **Cultivation** mechanics for T-gate support
+
+**Language Composition:**
+- Python: 69.6%
+- OpenQASM: 30.4%
+
+## Quick Start
+
+### Basic Usage
+
+To execute the 3D pipeline on an OpenQASM benchmark file:
 
 ```bash
 python main.py
 ```
 
 ### Modifying Benchmarks
-You can swap out or experiment with alternative quantum circuits inside `main.py`:
+
+Swap out or experiment with alternative quantum circuits inside `main.py`:
+
 ```python
 # Change circuit source in main.py
 circ = zx.Circuit.from_qasm_file("benchmark/your_circuit.qasm")
 ```
 
+### Alternative Entry Points
+
+The repository includes specialized entry points:
+
+```bash
+# Clifford circuit routing
+python main_clifford.py
+
+# Magic state distillation pipeline
+python main_distillation.py
+
+# Cultivation-based T-gate support
+python main_cultivation.py
+```
+
 ---
 
-## Sample Metrics & Output
+## Sample Output
 
 When execution finishes, the pipeline yields analytical details and opens an interactive 3D visualization window:
 
@@ -33,119 +69,375 @@ Bounding box
 Bounding box volume = 1225
 ```
 
-- **Red Cubes/Faces:** $X$-spider nodes/boundaries.
-- **Blue Cubes/Faces:** $Z$-spider nodes/boundaries.
-- **Yellow Pipes:** Hadamard edge connections.
+**Visualization Legend:**
+- **Red Cubes/Faces:** X-spider nodes/boundaries
+- **Blue Cubes/Faces:** Z-spider nodes/boundaries
+- **Yellow Pipes:** Hadamard edge connections
 
 ---
 
+## Core Modules
 
+### Graph Processing & Simplification
 
-# Detailed Algorithm Workflow
+#### `pft.py` - Pauli Frame Tracking
+Performs Pauli frame tracking on PyZX graphs with explicit Hadamard nodes. Tracks X and Z frame bits across qubits, handles CNOT propagation, and identifies T-gate nodes requiring X-frame compensation.
 
-## 1. Graph Simplification & Spider Splitting
+**Key Functions:**
+- `track_pauli_frames()` - Core frame tracking algorithm
+- `is_pi_phase()`, `is_pi_2_phase()`, `is_pi_4_phase()` - Phase detection helpers
 
-Before embedding into a physical 3D grid, the raw quantum circuit is converted into a graph using PyZX. It passes through initial ZX-calculus identity and spider simplifications to contract redundant structures.
+#### `simplify.py` - Degree Reduction
+Decomposes high-degree vertices into chains of bounded-degree nodes (configurable max degree of 3 or 4). Preserves all gate phases and maintains graph semantics.
 
-Because physical hardware topologies or routing grids cannot accommodate arbitrary $N$-degree connectivity at a single coordinate, the algorithm restricts the graph's maximum vertex degree.
+**Key Components:**
+- Vertex degree analysis and decomposition
+- Chain generation with sequential neighbor ordering
+- Phase retention on original vertices
 
+### Spatial Embedding
+
+#### `layout.py` - 2D Qubit Layout
+Assigns qubits to a 2D square floor grid with computed spacing. Calculates optimal grid dimensions based on qubit count and performs mapping to (X, Y) coordinates.
+
+**Key Calculations:**
+- Grid width: `k = ⌈√Q⌉`
+- Position: `x = STEP × (q div k)`, `y = STEP × (q mod k)`
+
+#### `geometry.py` - Spatial Utilities
+Provides bounding box computations, spatial ring generation, and volume calculations for embedded circuits.
+
+**Key Functions:**
+- `get_bounding_square_ring()` - Computes perimeter positions
+- `compute_bounding_volume()` - Calculates bounding box dimensions
+
+#### `tracker.py` - Obstacle Management
+Manages qubit Z-levels and tracks placed geometry obstacles. Maintains free space tracking for both qubit columns and extra reserved regions (cultivation sites, distillation factories).
+
+**Key Class:**
+- `QubitTracker` - Obstacle tracking and availability checking
+
+### Routing Engines
+
+#### `cnot_routing.py` - CNOT/Multi-Qubit Gate Routing
+Implements stateful orientation-aware A* search for inter-qubit gate connections. Maintains 4-tuple state space: `(Position, Orientation, Direction, Type)`.
+
+**Key Features:**
+- Orientation-aware pathfinding
+- Face rotation tracking via `SEARCH_TRANSITIONS` lookup
+- Goal validation with type matching
+
+**Key Functions:**
+- `a_star_3d()` - Main 3D A* pathfinding
+- `get_neighbors_3d()` - State transition generation
+
+#### `t_routing.py` - T-Gate/Single-Qubit Routing
+Specialized 2D routing for single-qubit connections within fixed Z layers. Used for magic state T-gate injection and consumption.
+
+**Key Functions:**
+- `a_star_2d()` - 2D A* with orientation constraints
+- `heuristic_2d()` - Manhattan distance heuristic
+
+#### `s_routing.py` - S-Routing Framework
+Implements S-routing structures for specific quantum operations. Includes 2-cube and 3-cube placement strategies with automatic Z-level climbing for obstacle avoidance.
+
+#### `h_routing.py` - Hadamard Gate Routing
+Specialized routing for Hadamard operations, including routing and visualization helpers.
+
+### Layer Processing
+
+#### `layer_processing.py` - Circuit Layer Management
+Orchestrates the multi-stage routing pipeline. Processes logical circuit layers sequentially, routing inter-qubit gates then single-qubit wires.
+
+**Pipeline Stages:**
+1. **Gate Routing:** A* finds optimal paths for each interaction edge
+2. **Wire Routing:** Direct columns along single-qubit timelines
+
+**Key Functions:**
+- `process_all_layers()` - Main orchestration
+- Layer-by-layer execution with obstacle updates
+
+#### `column_fill.py` - Qubit Column Filling
+Fills columns connecting boundary nodes along qubit timelines. Handles orientation flips for Hadamard nodes and maintains continuity.
+
+**Key Functions:**
+- `build_qubit_column_index()` - Maps coordinates to qubits
+- `fill_qubit_columns()` - Fills gaps in columns
+
+### Layout Regions
+
+#### `create_rings.py` - Layout Region Computation
+Partitions 2D qubit space into functional regions: data qubits, routing ancilla, bus sites, and cultivation zones.
+
+**Regions:**
+- **Data:** Logical qubits
+- **Routing:** Interior ancilla for cross-qubit connections
+- **Bus:** Outer ancilla touching open space
+- **Cultivation:** Magic state preparation sites
+
+**Key Functions:**
+- `compute_layout_regions()` - Region partitioning
+- `plot_layout_regions()` - Region visualization
+
+### T-Gate Support Mechanics
+
+#### `cultivation.py` - Cultivation-Based T-Gates
+Implements cultiva ion sites for sequential T-gate magic state generation. Each site occupies a 1×1 qubit column.
+
+**Key Class:**
+- `CultivationSite` - Per-site tracking
+
+#### `distillation.py` - Distillation Factory System
+Implements 3×3 factory footprints for batch magic state production with latency tracking and consumption scheduling.
+
+**Key Components:**
+- `DistillationFactory` - Factory state and history
+- `DistillationFactoryRegistry` - Multi-factory coordination
+- Automatic ready state management
+- Per-attempt attempt history tracking
+
+### Utilities & Visualization
+
+#### `utils.py` - Vectorial Operations
+Core mathematical utilities for 3D pathfinding:
+- **Vectors:** 3D tuple addition, negation, absolute values
+- **Orientations:** 8-orientation domain with transition lookups
+- **Path Drawing:** Matplotlib rendering of calculated paths
+
+**Constants:**
+- `ORIENTATIONS` - All 8 possible orientations (e.g., "XXX", "XZZ")
+- `SEARCH_TRANSITIONS` - Orientation updates for path bends
+- `DRAW_TRANSITIONS` - Visual rendering adjustments
+
+#### `visualize.py` - 3D Visualization
+Matplotlib-based 3D rendering engine with geometry primitives:
+- **Cube** - Voxel representation with type-based coloring
+- **Pipe** - Edge connections between voxels
+- Axis balancing and 3D visualization setup
+
+**Key Classes:**
+- `Cube` - Cube geometry with type/color mapping
+- `Pipe` - Pipe/edge geometry between positions
+
+#### `reporting.py` - Analysis & Output
+Generates performance reports and orchestrates visualization:
+- Volume statistics and bounding box analysis
+- Integration with cultivation/distillation registries
+- Final 3D circuit visualization
+
+**Key Functions:**
+- `print_volume_report()` - Performance metrics
+- `visualize_circuit()` - Main visualization orchestration
+
+#### `spectral_layout.py` - Advanced Layout Optimization
+Implements spectral graph partitioning and optimized qubit placement using advanced graph algorithms.
+
+---
+
+## Algorithm Workflow
+
+### 1. Graph Simplification & Spider Splitting
+
+Before embedding, the raw quantum circuit is converted to a PyZX graph and simplified:
+1. Identity and spider reductions via ZX-calculus
+2. Hadamard consolidation
+3. Degree constraint application (max degree 3 or 4)
+
+High-degree spiders are decomposed into chains:
 ```
-  High-Degree Spider (e.g., Degree 6)           Bounded Chain Decomposition (Degree 3)
-           \   |   /                                       \   /
-            \  |  /                                         \ /
-           ---(v)---          ==========>                   (v1)---(v2)---(v3)
-            /  |  \                                                /   \   |
-           /   |   \                                              /     \  |
-
+  High-Degree Spider (Degree 6)         Bounded Chain (Degree 3)
+           \   |   /                              \   /
+            \  |  /              ====>            \ /
+           ---(v)---                           (v1)---(v2)---(v3)
+            /  |  \                              /   \   |
+           /   |   \                            /     \  |
 ```
 
-* **Target Constraints:** The algorithm decomposes vertices into a chain of nodes with a maximum degree of either 3 (`three_deg_simp.py`) or 4 (`four_deg_simplify.py`).
+**Target Constraints:** Degree-3 or degree-4 decomposition
 
+### 2. Spatial 3D Grid Assignment
 
-* **Chain Generation:** For a high-degree vertex $v$, its neighbors are sorted sequentially by their timeline row value.
+Map abstract topological nodes to 3D voxel coordinates:
 
+**2D Qubit Layout (X, Y Floorplan):**
+- Qubits assigned to square floor grid
+- Layout width: `k = ⌈√Q⌉`
+- Position: `x = STEP × (q div k)`, `y = STEP × (q mod k)`
 
-* **Properties Preservation:** The original vertex is removed. It is replaced by a linear sequence of $n$ new vertices linked by chain edges. The original gate phase is retained exclusively on the first node in the chain ($\text{phase value} = \text{phase}$ if $i == 0$ else $0$) to maintain semantic equality.
+**Temporal Axis (Z-unrolling):**
+- Execution timeline flows along Z-axis
+- Vertices grouped dynamically by sequence layers
+- Nodes placed at increasing Z as timeline progresses
 
+### 3. Stateful Orientation-Aware A* Search
 
+Enhanced 3D pathfinding preserving quantum parity alignments:
 
----
+**Search State:**
+```
+State = (Position, Orientation, Direction, Type)
+```
 
-## 2. Spatial 3D Grid Assignment
+- **Position:** Physical (x, y, z) coordinates
+- **Orientation:** String tracking axis alignment (e.g., "XZZ", "XZX")
+- **Direction:** Vector along which path arrived at voxel
+- **Type:** Vertex behavior (X-spider, Z-spider, neutral)
 
-Once the graph satisfies the degree constraints, it maps the abstract topological nodes to localized 3D voxel coordinates:
-
-* **2D Qubit Layout ($X, Y$ Floorplan):** Qubits are assigned to a square 2D floor grid. The layout width $k$ is calculated based on the maximum number of qubits: $k = \lceil\sqrt{Q}\rceil$. The spatial $x$ and $y$ positions use a spacing scale factor `STEP`:
-
-
-
-$$x = \text{STEP} \times \text{(q div k)}$$
-
-
-$$y = \text{STEP} \times \text{(q mod k)}$$
-
-
-* **Temporal Axis ($Z$-unrolling):** The execution timeline flows along the $Z$-axis. Graph vertices are grouped dynamically by their sequence layers. As nodes in a layer are physically placed at the current $Z$-level, the algorithm increments the layer index to the next available vertical ceiling ($\text{max z} + 1$) to ensure routing clearance.
-
-
-
----
-
-## 3. Stateful Orientation-Aware A* Search
-
-Unlike standard 3D pathfinders that only search for a physical coordinate $(x, y, z)$, this routing engine must preserve specific quantum parity alignments. Paths represent topological interactions, meaning wires entering or exiting a node must match the appropriate color face of a ZX-spider ($X$-red vs. $Z$-blue).
-
-### The Search State
-
-Every step in the A* queue evaluates an enhanced 4-tuple state space:
-
-
-$$\text{State} = (\text{Position}, \text{Orientation}, \text{Direction}, \text{Type})$$
-
-
-Where:
-
-* **Position:** The physical $(x,y,z)$ coordinates in the grid.
-
-
-* **Orientation:** A string tracking the alignment of the 3 fundamental structural axes (e.g., `"XZZ"` or `"XZX"`).
-
-
-* **Direction:** The vector along which the path arrived at this voxel.
-
-
-* **Type:** Tracks the vertex behavior ($X$-spider, $Z$-spider, or `0` for neutral/boundary nodes).
-
-
-
-### Search Transitions and Rotations
-
-As the pathfinder progresses through neighboring coordinates, the orientation of the tracking frame dynamically shifts.
-
-* When changing direction (e.g., executing a right-angle bend from the $+X$ direction to the $+Z$ direction), the algorithm updates the orientation metadata.
-
-
-* It swaps the tracking indices using a `SEARCH_TRANSITIONS` lookup table to mirror physical face rotation:
-
-
+**Search Transitions:**
+As pathfinder progresses, orientation shifts dynamically:
+- Direction changes trigger orientation updates
+- Tracking indices swapped via `SEARCH_TRANSITIONS` lookup
+- Mirrors physical face rotation
 
 ```python
-# Swapping the face tracking properties when the path bends
+# Swapping face tracking properties when path bends
 o[old_axis], o[new_axis] = o[new_axis], o[old_axis]
-
 ```
 
-### Goal Validation
+**Goal Validation:**
+Path must terminate at correct interface type with matching entry axis.
 
-A path cannot simply terminate at the target position; it must hit the correct interface type. The algorithm checks that the path's entry axis matches the exact opposite properties requested by the target node's type configuration ($X$-spider connects to $Z$-faces, and vice versa).
+### 4. Multi-Stage Routing Execution Loop
+
+Two-stage pipeline in the main execution:
+
+**Stage 1 - Gate/Inter-Qubit Routing:**
+- Loop through logical circuit layers
+- For each interaction edge between qubits, A* finds optimal 3D path
+- Update obstacle tracker with placed paths
+
+**Stage 2 - Straight Line Qubit Wires:**
+- Handle long-term state preservation along single qubit
+- Connect boundary nodes along each qubit column
 
 ---
 
-## 4. Multi-Stage Routing Execution Loop
+## Project Structure
 
-The overall pipeline maps out paths by strictly tracking obstacles across two separate stages in `main.py`:
+```
+lattice_surgery/
+├── README.md                          # This file
+├── main.py                            # Primary entry point
+├── main_clifford.py                   # Clifford-only routing
+├── main_distillation.py               # Distillation-based pipeline
+├── main_cultivation.py                # Cultivation-based pipeline
+│
+├── Graph Processing
+│├── pft.py                           # Pauli frame tracking
+│├── simplify.py                      # Degree reduction
+│└── layer_processing.py              # Layer orchestration
+│
+├── Spatial Embedding
+├── layout.py                          # 2D qubit layout
+├── geometry.py                        # Spatial utilities
+├── tracker.py                         # Obstacle tracking
+└── spectral_layout.py                # Advanced layout optimization
+│
+├── Routing Engines
+├── cnot_routing.py                   # Multi-qubit gate routing (A*)
+├── t_routing.py                      # Single-qubit routing (2D A*)
+├── s_routing.py                      # S-routing structures
+└── h_routing.py                      # Hadamard routing
+│
+├── Circuit Filling & Layout
+├── column_fill.py                    # Qubit column filling
+├── create_rings.py                   # Layout region computation
+│
+├── T-Gate Mechanics
+├── cultivation.py                    # Cultivation sites
+└── distillation.py                   # Distillation factories
+│
+├── Utilities & Visualization
+├── utils.py                          # Vector ops, orientations
+├── visualize.py                      # 3D Matplotlib rendering
+└── reporting.py                      # Analysis & output
+│
+└── Benchmarks & Data
+    ├── benchmark/                    # OpenQASM benchmark circuits
+    └── random_bench/                 # Random circuit generation
+```
 
-1. **Gate / Inter-Qubit Routing:** The layout loops through the logical circuit layers. For every interaction edge between different qubits, the A* engine finds an optimal 3D path through the grid. Once a path is established, its intermediate points are added to an `occupied` blacklist to prevent future routes from causing cross-talk or physical collisions.
+---
 
+## Key Concepts
 
-2. **Straight Line Qubit Wires:** After resolving cross-qubit gates, the engine handles long-term state preservation along a single qubit. These connections act as direct structural columns that run vertically along the $Z$-axis, connecting a qubit's past interaction layer to its next layer.
+### ZX-Calculus
+The ZX-calculus provides a graphical formalism for quantum computation using spider nodes and edges representing quantum gates and their interactions.
+
+### Lattice Surgery
+Lattice surgery enables logical qubit operations through coordinated measurements on physical qubit arrays, reducing overhead compared to surface codes.
+
+### Pauli Frame Tracking
+Implicit gate compensation technique that tracks X and Z frame bits, deferring or eliminating explicit gate applications.
+
+### Magic States
+Non-stabilizer states (e.g., T states) required for universal quantum computation. Generated via distillation or cultivation.
+
+### Orientation Tracking
+Maintains quantum parity constraints during 3D routing by tracking fundamental structural axes and their alignments.
+
+---
+
+## Performance Metrics
+
+The framework reports:
+- **Bounding Box Dimensions** - Grid extent along each axis
+- **Volume** - Total voxels in bounding box
+- **Cell Count** - Actually placed geometry cells
+- **Runtime** - Total execution time in seconds
+
+Example output:
+```
+Bounding volume (excluding T nodes): 7 x 7 x 25 = 1225 unit cells
+  Bounding box min: (0, 0, 0)
+  Bounding box max: (6, 6, 24)
+  Actual placed cell count (non-T): 1100
+Total runtime: 2.456 seconds
+```
+
+---
+
+## Dependencies
+
+- **pyzx** - PyZX quantum circuit library
+- **matplotlib** - 3D visualization
+- **numpy** - Numerical operations
+- **heapq** - Priority queue for A* search
+- **scipy** - Spectral layout algorithms (for advanced layouts)
+
+---
+
+## References
+
+Key concepts from quantum computing and graph theory:
+- ZX-Calculus: Coecke & Duncan (2011)
+- Lattice Surgery: Horsman et al. (2012)
+- Magic State Distillation: Bravyi & Kitaev (2005)
+- A* Pathfinding with Orientations: Enhanced search with state augmentation
+
+---
+
+## Future Enhancements
+
+- [ ] GPU-accelerated A* search for larger circuits
+- [ ] Advanced layout optimization via machine learning
+- [ ] Support for higher-degree spiders (5+)
+- [ ] Dynamic obstacle rebalancing during routing
+- [ ] Multi-threaded layer processing
+- [ ] Real-time visualization updates during execution
+
+---
+
+## License
+
+Unlicensed. See repository for details.
+
+---
+
+## Contributing
+
+Contributions welcome! Please ensure:
+- Code follows existing style conventions
+- All new modules include docstrings
+- Visualization updates are tested with sample benchmarks
+- Performance regressions are addressed
