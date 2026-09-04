@@ -59,3 +59,9 @@ All A* variants use orientation-transition tables (`SEARCH_TRANSITIONS`/`DRAW_TR
 ---
 
 **In summary**: ZX normalization → Pauli-frame/T-depth analysis → spectral-graph-theoretic qubit placement (Laplacian embedding + Procrustes + Hungarian assignment) → exact ILP-based ancilla-resource packing with reachability constraints → oriented 3D A* lattice-surgery routing → tensor-network round-trip verification.
+
+![Input ZX Graph](images/Figure_1.png)
+![Hungarian matching with Spectral Embedding](images/Figure_2.png)
+![Data and Ancilla placement](images/Figure_3.png)
+![Magic State Factory Optimal Placement](images/Figure_4.png)
+![Fully Routed Pipe Diagram](images/Figure_5.png)
